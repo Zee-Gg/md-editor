@@ -4,6 +4,7 @@ import { Server } from "socket.io";
 import cors from "cors";
 import authRoutes from "./routes/auth.routes";
 import documentRoutes from "./routes/document.routes";
+import { registerSocketHandlers } from "./realtime/socket-handlers";
 
 const app = express();
 app.use(cors());
@@ -24,7 +25,7 @@ io.on("connection", (socket) => {
     console.log("User disconnected:", socket.id);
   });
 });
-
+registerSocketHandlers(io);
 const PORT = process.env.PORT || 4000;
 httpServer.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
