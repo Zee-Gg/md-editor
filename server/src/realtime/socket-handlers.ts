@@ -3,9 +3,16 @@ import * as Y from "yjs";
 import { verifyToken } from "../utils/jwt";
 import { getYDoc, loadDocIntoMemory, scheduleSave } from "./yjs-manager";
 import { prisma } from "../lib/prisma";
+import {
+  addUserToDocument,
+  removeUserFromDocument,
+  updateCursor,
+  getUsersInDocument,
+} from "./presence-manager";
 
 interface AuthedSocket extends Socket {
   userId?: string;
+  userName?: string;
 }
 
 export function registerSocketHandlers(io: Server) {
@@ -53,14 +60,21 @@ export function registerSocketHandlers(io: Server) {
         return;
       }
 
+      const user = await prisma.user.findUnique({ where: { id: userId } });
+      const userName = user?.name || "Unknown";
+      socket.userName = userName;
+
       currentDocId = documentId;
       socket.join(documentId);
 
       const ydoc = await loadDocIntoMemory(documentId);
       const state = Y.encodeStateAsUpdate(ydoc);
-
       socket.emit("sync-init", state);
-      socket.to(documentId).emit("user-joined", { userId });
+
+      // Add to presence, tell everyone (including the new user) who's online
+      const presenceUser = addUserToDocument(documentId, socket.id, userId, userName);
+      io.to(documentId).emit("presence-list", getUsersInDocument(documentId));
+      socket.to(documentId).emit("user-joined", presenceUser);
     });
 
     socket.on("sync-update", (update: Uint8Array) => {
@@ -75,8 +89,33 @@ export function registerSocketHandlers(io: Server) {
       scheduleSave(currentDocId);
     });
 
+    // Cursor position broadcast
+    socket.on("cursor-move", (position: number) => {
+      if (!currentDocId) return;
+
+      updateCursor(currentDocId, socket.id, position);
+      socket.to(currentDocId).emit("cursor-update", {
+        userId,
+        socketId: socket.id,
+        position,
+      });
+    });
+
+    // Typing indicator
+    socket.on("typing-start", () => {
+      if (!currentDocId) return;
+      socket.to(currentDocId).emit("user-typing", { userId, userName: socket.userName });
+    });
+
+    socket.on("typing-stop", () => {
+      if (!currentDocId) return;
+      socket.to(currentDocId).emit("user-stopped-typing", { userId });
+    });
+
     socket.on("disconnect", () => {
       if (currentDocId) {
+        removeUserFromDocument(currentDocId, socket.id);
+        io.to(currentDocId).emit("presence-list", getUsersInDocument(currentDocId));
         socket.to(currentDocId).emit("user-left", { userId });
       }
       console.log(`User ${userId} disconnected`);
