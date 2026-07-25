@@ -2,9 +2,13 @@ import express from "express";
 import { createServer } from "http";
 import { Server } from "socket.io";
 import cors from "cors";
+import authRoutes from "./routes/auth.routes";
 
 const app = express();
 app.use(cors());
+app.use(express.json());
+
+app.use("/api/auth", authRoutes);
 
 const httpServer = createServer(app);
 const io = new Server(httpServer, {
