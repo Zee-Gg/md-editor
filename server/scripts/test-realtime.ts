@@ -2,8 +2,8 @@ import { io as ioClient } from "socket.io-client";
 import * as Y from "yjs";
 
 // Replace with a real token (from login) and a real document ID (from create/list)
-const TOKEN = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOiJmNDA3ODQ5Ny1mNmJmLTQxODgtODVjNS0zNTdjNWU4NzkwNzQiLCJpYXQiOjE3ODUwMDM5ODUsImV4cCI6MTc4NTYwODc4NX0.-jsYhpbsnnh3HoTSFpTgiZx-D0ma9lGa4NhBgvzfo90";
-const DOC_ID = "8fb5ff63-7ca3-425e-98a9-fdadd35acc62";
+const TOKEN = "";
+const DOC_ID = "";
 
 function createClient(name: string): Promise<{ socket: any; ydoc: Y.Doc; ytext: Y.Text }> {
   return new Promise((resolve) => {
