@@ -17,6 +17,11 @@ interface PresenceUser {
   cursorPosition?: number;
 }
 
+interface RemoteCursor {
+  socketId: string;
+  position: number;
+}
+
 export default function EditorPage() {
   const params = useParams();
   const documentId = params.id as string;
@@ -25,6 +30,7 @@ export default function EditorPage() {
   const [connected, setConnected] = useState(false);
   const [users, setUsers] = useState<PresenceUser[]>([]);
   const [typingUser, setTypingUser] = useState<string | null>(null);
+  const [remoteCursors, setRemoteCursors] = useState<RemoteCursor[]>([]);
 
   const ydocRef = useRef<Y.Doc | null>(null);
   const ytextRef = useRef<Y.Text | null>(null);
@@ -32,7 +38,7 @@ export default function EditorPage() {
   const typingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
-    // TEMP: token comes from localStorage until Module 9 login UI exists
+    // TEMP: token comes from localStorage until login page exists
     const token = localStorage.getItem("token");
     if (!token) {
       console.error("No token found — log in first.");
@@ -53,10 +59,11 @@ export default function EditorPage() {
     });
 
     socket.on("disconnect", () => setConnected(false));
+
     socket.on("error-message", (message: string) => {
-  console.error("Server error:", message);
-  alert(`Connection error: ${message}`);
-});
+      console.error("Server error:", message);
+      alert(`Connection error: ${message}`);
+    });
 
     socket.on("sync-init", (state: Uint8Array) => {
       Y.applyUpdate(ydoc, new Uint8Array(state));
@@ -72,11 +79,26 @@ export default function EditorPage() {
       setUsers(userList);
     });
 
+    socket.on("user-left", ({ userId }: { userId: string }) => {
+      setUsers((prev) => prev.filter((u) => u.userId !== userId));
+      setRemoteCursors((prev) => prev.filter((c) => c.socketId !== userId));
+    });
+
     socket.on("user-typing", ({ userName }: { userName: string }) => {
       setTypingUser(userName);
       if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
       typingTimeoutRef.current = setTimeout(() => setTypingUser(null), 2000);
     });
+
+    socket.on(
+      "cursor-update",
+      ({ socketId, position }: { userId: string; socketId: string; position: number }) => {
+        setRemoteCursors((prev) => {
+          const others = prev.filter((c) => c.socketId !== socketId);
+          return [...others, { socketId, position }];
+        });
+      }
+    );
 
     ydoc.on("update", (update: Uint8Array, origin: unknown) => {
       if (origin === "local") {
@@ -102,7 +124,28 @@ export default function EditorPage() {
 
     setContent(newValue);
     socketRef.current?.emit("typing-start");
+    socketRef.current?.emit("cursor-move", e.target.selectionStart);
   }, []);
+
+  const handleCursorMove = useCallback((e: React.SyntheticEvent<HTMLTextAreaElement>) => {
+    const target = e.target as HTMLTextAreaElement;
+    socketRef.current?.emit("cursor-move", target.selectionStart);
+  }, []);
+
+  const cursorMarkers = remoteCursors
+    .map((cursor) => {
+      const user = users.find((u) => u.socketId === cursor.socketId);
+      if (!user) return null;
+      const relativePosition = content.length > 0 ? cursor.position / content.length : 0;
+      return {
+        socketId: cursor.socketId,
+        color: user.color,
+        relativePosition,
+      };
+    })
+    .filter(
+      (c): c is { socketId: string; color: string; relativePosition: number } => c !== null
+    );
 
   return (
     <div className="flex h-screen flex-col">
@@ -121,6 +164,8 @@ export default function EditorPage() {
         <textarea
           value={content}
           onChange={handleChange}
+          onClick={handleCursorMove}
+          onKeyUp={handleCursorMove}
           spellCheck={false}
           placeholder="Start writing…"
           className="h-full w-1/2 resize-none p-6 text-sm leading-relaxed outline-none"
@@ -131,7 +176,7 @@ export default function EditorPage() {
           }}
         />
 
-        <SignalSeam cursors={[]} />
+        <SignalSeam cursors={cursorMarkers} />
 
         <div
           className="h-full w-1/2 overflow-y-auto p-6 text-sm leading-relaxed"
