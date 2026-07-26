@@ -19,9 +19,16 @@ interface VersionSummary {
   preview: string;
   length: number;
 }
+interface Collaborator {
+  id: string;
+  role: string;
+  user: { id: string; name: string; email: string };
+}
 
-
-
+interface CollaboratorsResponse {
+  owner: { id: string; name: string; email: string };
+  collaborators: Collaborator[];
+}
 async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   const token = localStorage.getItem("token");
 
@@ -76,4 +83,22 @@ export function deleteDocument(id: string) {
 
 export function listVersions(documentId: string) {
   return request<VersionSummary[]>(`/api/documents/${documentId}/versions`);
+}
+
+
+export function listCollaborators(documentId: string) {
+  return request<CollaboratorsResponse>(`/api/documents/${documentId}/collaborators`);
+}
+
+export function addCollaborator(documentId: string, email: string, role: "editor" | "viewer") {
+  return request<Collaborator>(`/api/documents/${documentId}/collaborators`, {
+    method: "POST",
+    body: JSON.stringify({ email, role }),
+  });
+}
+
+export function removeCollaborator(documentId: string, userId: string) {
+  return request<{ message: string }>(`/api/documents/${documentId}/collaborators/${userId}`, {
+    method: "DELETE",
+  });
 }

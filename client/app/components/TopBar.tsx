@@ -14,11 +14,13 @@ export function TopBar({
   users,
   connected,
   onToggleHistory,
+  onToggleShare,
 }: {
   title: string;
   users: PresenceUser[];
   connected: boolean;
   onToggleHistory?: () => void;
+  onToggleShare?: () => void;
 }) {
   return (
     <div
@@ -42,6 +44,15 @@ export function TopBar({
 
       <div className="flex items-center gap-4">
         <PresenceAvatars users={users} />
+        {onToggleShare && (
+          <button
+            onClick={onToggleShare}
+            className="text-xs"
+            style={{ color: "var(--color-chalk)", fontFamily: "var(--font-display)" }}
+          >
+            Share
+          </button>
+        )}
         {onToggleHistory && (
           <button
             onClick={onToggleHistory}

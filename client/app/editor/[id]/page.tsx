@@ -10,7 +10,8 @@ import remarkGfm from "remark-gfm";
 import { createSocket } from "../../lib/socket";
 import { TopBar } from "../../components/TopBar";
 import { CollaborativeEditor } from "../../components/CollaborativeEditor";
-import { VersionHistoryPanel} from "../../components/VersionHistoryPanel";
+import { VersionHistoryPanel } from "../../components/VersionHistoryPanel";
+import { SharePanel } from "../../components/SharePanel";
 
 interface PresenceUser {
   userId: string;
@@ -19,7 +20,14 @@ interface PresenceUser {
   color: string;
 }
 
-const CURSOR_COLORS = ["#F87171", "#FBBF24", "#34D399", "#60A5FA", "#A78BFA", "#F472B6"];
+const CURSOR_COLORS = [
+  "#F87171",
+  "#FBBF24",
+  "#34D399",
+  "#60A5FA",
+  "#A78BFA",
+  "#F472B6",
+];
 
 export default function EditorPage() {
   const params = useParams();
@@ -36,6 +44,8 @@ export default function EditorPage() {
   const [users, setUsers] = useState<PresenceUser[]>([]);
   const [typingUser, setTypingUser] = useState<string | null>(null);
   const [historyOpen, setHistoryOpen] = useState(false);
+  const [shareOpen, setShareOpen] = useState(false);
+  const [role, setRole] = useState<string | null>(null);
 
   const socketRef = useRef<ReturnType<typeof createSocket> | null>(null);
   const typingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -47,7 +57,8 @@ export default function EditorPage() {
       return;
     }
 
-    const myColor = CURSOR_COLORS[Math.floor(Math.random() * CURSOR_COLORS.length)];
+    const myColor =
+      CURSOR_COLORS[Math.floor(Math.random() * CURSOR_COLORS.length)];
     awareness.setLocalStateField("user", { name: "You", color: myColor });
 
     const socket = createSocket(token);
@@ -76,19 +87,31 @@ export default function EditorPage() {
     });
 
     socket.on("awareness-update", (update: Uint8Array) => {
-      awarenessProtocol.applyAwarenessUpdate(awareness, new Uint8Array(update), "remote");
+      awarenessProtocol.applyAwarenessUpdate(
+        awareness,
+        new Uint8Array(update),
+        "remote",
+      );
     });
 
     socket.on("presence-list", (userList: PresenceUser[]) => {
       setUsers(userList);
       const me = userList.find((u) => u.socketId === socket.id);
-      if (me) awareness.setLocalStateField("user", { name: me.name, color: me.color });
+      if (me)
+        awareness.setLocalStateField("user", {
+          name: me.name,
+          color: me.color,
+        });
     });
 
     socket.on("user-typing", ({ userName }: { userName: string }) => {
       setTypingUser(userName);
       if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
       typingTimeoutRef.current = setTimeout(() => setTypingUser(null), 2000);
+    });
+
+    socket.on("role-assigned", (assignedRole: string) => {
+      setRole(assignedRole);
     });
 
     const handleDocUpdate = (update: Uint8Array, origin: unknown) => {
@@ -109,7 +132,10 @@ export default function EditorPage() {
       removed: number[];
     }) => {
       const changedClients = added.concat(updated).concat(removed);
-      const update = awarenessProtocol.encodeAwarenessUpdate(awareness, changedClients);
+      const update = awarenessProtocol.encodeAwarenessUpdate(
+        awareness,
+        changedClients,
+      );
       socket.emit("awareness-update", update);
     };
     awareness.on("update", handleAwarenessUpdate);
@@ -124,7 +150,9 @@ export default function EditorPage() {
 
   function handleRestore(versionId: string) {
     if (
-      !confirm("Restore this version? This will overwrite the current content for everyone.")
+      !confirm(
+        "Restore this version? This will overwrite the current content for everyone.",
+      )
     )
       return;
     socketRef.current?.emit("restore-version", versionId);
@@ -138,14 +166,27 @@ export default function EditorPage() {
         users={users}
         connected={connected}
         onToggleHistory={() => setHistoryOpen((v) => !v)}
+        onToggleShare={() => setShareOpen((v) => !v)}
       />
 
       {typingUser && (
         <div
           className="px-6 py-1 text-xs"
-          style={{ color: "var(--color-ember)", fontFamily: "var(--font-mono)" }}
+          style={{
+            color: "var(--color-ember)",
+            fontFamily: "var(--font-mono)",
+          }}
         >
           {typingUser} is typing…
+        </div>
+      )}
+
+      {role === "viewer" && (
+        <div
+          className="px-6 py-1 text-xs"
+          style={{ color: "#9CA3AF", fontFamily: "var(--font-mono)" }}
+        >
+          You have view-only access to this document.
         </div>
       )}
 
@@ -154,9 +195,13 @@ export default function EditorPage() {
           ytext={ytext}
           awareness={awareness}
           onTyping={() => socketRef.current?.emit("typing-start")}
+          readOnly={role === "viewer"}
         />
 
-        <div className="w-px shrink-0" style={{ backgroundColor: "var(--color-line)" }} />
+        <div
+          className="w-px shrink-0"
+          style={{ backgroundColor: "var(--color-line)" }}
+        />
 
         <div
           className="h-full flex-1 overflow-y-auto p-6 text-sm leading-relaxed"
@@ -172,6 +217,11 @@ export default function EditorPage() {
           open={historyOpen}
           onClose={() => setHistoryOpen(false)}
           onRestore={handleRestore}
+        />
+        <SharePanel
+          documentId={documentId}
+          open={shareOpen}
+          onClose={() => setShareOpen(false)}
         />
       </div>
     </div>

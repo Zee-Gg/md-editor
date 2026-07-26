@@ -57,15 +57,18 @@ export function registerSocketHandlers(io: Server) {
       }
 
       const isOwner = document.ownerId === userId;
-      const isCollaborator = document.collaborators.some(
+      const collaboratorEntry = document.collaborators.find(
         (c: { userId: string }) => c.userId === userId,
       );
 
-      if (!isOwner && !isCollaborator) {
+      if (!isOwner && !collaboratorEntry) {
         socket.emit("error-message", "Access denied");
         return;
       }
 
+      const role = isOwner ? "owner" : collaboratorEntry!.role;
+      socket.data.role = role;
+      socket.emit("role-assigned", role);
       const user = await prisma.user.findUnique({ where: { id: userId } });
       const userName = user?.name || "Unknown";
       socket.userName = userName;
@@ -90,6 +93,7 @@ export function registerSocketHandlers(io: Server) {
 
     socket.on("sync-update", (update: Uint8Array) => {
       if (!currentDocId) return;
+      if (socket.data.role === "viewer") return; // viewers can't edit
 
       const ydoc = getYDoc(currentDocId);
       Y.applyUpdate(ydoc, new Uint8Array(update));

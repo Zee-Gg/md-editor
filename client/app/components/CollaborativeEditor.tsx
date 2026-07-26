@@ -12,10 +12,12 @@ export function CollaborativeEditor({
   ytext,
   awareness,
   onTyping,
+  readOnly = false,
 }: {
   ytext: Y.Text;
   awareness: Awareness;
   onTyping: () => void;
+  readOnly?: boolean;
 }) {
   const containerRef = useRef<HTMLDivElement | null>(null);
 
@@ -28,6 +30,8 @@ export function CollaborativeEditor({
         basicSetup,
         markdown(),
         yCollab(ytext, awareness),
+        EditorState.readOnly.of(readOnly),
+        EditorView.editable.of(!readOnly),
         EditorView.updateListener.of((update) => {
           if (update.docChanged) onTyping();
         }),
@@ -63,7 +67,7 @@ export function CollaborativeEditor({
       view.destroy();
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [ytext, awareness]);
+  }, [ytext, awareness, readOnly]);
 
   return <div ref={containerRef} className="h-full w-1/2 overflow-y-auto" />;
 }
