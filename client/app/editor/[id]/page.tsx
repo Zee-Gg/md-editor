@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useParams } from "next/navigation";
+import { useRouter } from "next/navigation";
 import * as Y from "yjs";
 import { Awareness } from "y-protocols/awareness";
 import * as awarenessProtocol from "y-protocols/awareness";
@@ -18,7 +19,14 @@ interface PresenceUser {
   color: string;
 }
 
-const CURSOR_COLORS = ["#F87171", "#FBBF24", "#34D399", "#60A5FA", "#A78BFA", "#F472B6"];
+const CURSOR_COLORS = [
+  "#F87171",
+  "#FBBF24",
+  "#34D399",
+  "#60A5FA",
+  "#A78BFA",
+  "#F472B6",
+];
 
 export default function EditorPage() {
   const params = useParams();
@@ -36,15 +44,17 @@ export default function EditorPage() {
 
   const socketRef = useRef<ReturnType<typeof createSocket> | null>(null);
   const typingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const router = useRouter();
 
   useEffect(() => {
     const token = localStorage.getItem("token");
     if (!token) {
-      console.error("No token found — log in first.");
+      router.push("/login");
       return;
     }
 
-    const myColor = CURSOR_COLORS[Math.floor(Math.random() * CURSOR_COLORS.length)];
+    const myColor =
+      CURSOR_COLORS[Math.floor(Math.random() * CURSOR_COLORS.length)];
     awareness.setLocalStateField("user", { name: "You", color: myColor });
 
     const socket = createSocket(token);
@@ -73,13 +83,21 @@ export default function EditorPage() {
     });
 
     socket.on("awareness-update", (update: Uint8Array) => {
-      awarenessProtocol.applyAwarenessUpdate(awareness, new Uint8Array(update), "remote");
+      awarenessProtocol.applyAwarenessUpdate(
+        awareness,
+        new Uint8Array(update),
+        "remote",
+      );
     });
 
     socket.on("presence-list", (userList: PresenceUser[]) => {
       setUsers(userList);
       const me = userList.find((u) => u.socketId === socket.id);
-      if (me) awareness.setLocalStateField("user", { name: me.name, color: me.color });
+      if (me)
+        awareness.setLocalStateField("user", {
+          name: me.name,
+          color: me.color,
+        });
     });
 
     socket.on("user-typing", ({ userName }: { userName: string }) => {
@@ -106,7 +124,10 @@ export default function EditorPage() {
       removed: number[];
     }) => {
       const changedClients = added.concat(updated).concat(removed);
-      const update = awarenessProtocol.encodeAwarenessUpdate(awareness, changedClients);
+      const update = awarenessProtocol.encodeAwarenessUpdate(
+        awareness,
+        changedClients,
+      );
       socket.emit("awareness-update", update);
     };
     awareness.on("update", handleAwarenessUpdate);
@@ -126,7 +147,10 @@ export default function EditorPage() {
       {typingUser && (
         <div
           className="px-6 py-1 text-xs"
-          style={{ color: "var(--color-ember)", fontFamily: "var(--font-mono)" }}
+          style={{
+            color: "var(--color-ember)",
+            fontFamily: "var(--font-mono)",
+          }}
         >
           {typingUser} is typing…
         </div>
@@ -139,7 +163,10 @@ export default function EditorPage() {
           onTyping={() => socketRef.current?.emit("typing-start")}
         />
 
-        <div className="w-px shrink-0" style={{ backgroundColor: "var(--color-line)" }} />
+        <div
+          className="w-px shrink-0"
+          style={{ backgroundColor: "var(--color-line)" }}
+        />
 
         <div
           className="h-full w-1/2 overflow-y-auto p-6 text-sm leading-relaxed"
