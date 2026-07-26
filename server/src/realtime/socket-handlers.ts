@@ -1,7 +1,13 @@
 import { Server, Socket } from "socket.io";
 import * as Y from "yjs";
 import { verifyToken } from "../utils/jwt";
-import { getYDoc, loadDocIntoMemory, scheduleSave } from "./yjs-manager";
+import {
+  getYDoc,
+  loadDocIntoMemory,
+  scheduleSave,
+  replaceContent,
+  createManualVersion,
+} from "./yjs-manager";
 import { prisma } from "../lib/prisma";
 import {
   addUserToDocument,
@@ -92,6 +98,37 @@ export function registerSocketHandlers(io: Server) {
       socket.to(currentDocId).emit("sync-update", update);
 
       scheduleSave(currentDocId);
+    });
+
+    socket.on("restore-version", async (versionId: string) => {
+      if (!currentDocId) return;
+
+      try {
+        const version = await prisma.version.findUnique({
+          where: { id: versionId },
+        });
+        if (!version || version.documentId !== currentDocId) {
+          socket.emit("error-message", "Version not found");
+          return;
+        }
+
+        const update = replaceContent(currentDocId, version.content);
+        io.to(currentDocId).emit("sync-update", update);
+        scheduleSave(currentDocId);
+      } catch (error) {
+        console.error("Failed to restore version:", error);
+        socket.emit("error-message", "Failed to restore version");
+      }
+    });
+
+    socket.on("save-version-now", async () => {
+      if (!currentDocId) return;
+      try {
+        await createManualVersion(currentDocId);
+        socket.emit("version-saved");
+      } catch (error) {
+        console.error("Failed to save manual version:", error);
+      }
     });
 
     socket.on("awareness-update", (update: Uint8Array) => {

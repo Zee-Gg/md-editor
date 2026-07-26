@@ -13,6 +13,15 @@ interface DocumentSummary {
   ownerId: string;
 }
 
+interface VersionSummary {
+  id: string;
+  createdAt: string;
+  preview: string;
+  length: number;
+}
+
+
+
 async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   const token = localStorage.getItem("token");
 
@@ -63,4 +72,8 @@ export function deleteDocument(id: string) {
   return request<{ message: string }>(`/api/documents/${id}`, {
     method: "DELETE",
   });
+}
+
+export function listVersions(documentId: string) {
+  return request<VersionSummary[]>(`/api/documents/${documentId}/versions`);
 }

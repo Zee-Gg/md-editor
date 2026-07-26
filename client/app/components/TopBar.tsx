@@ -13,10 +13,12 @@ export function TopBar({
   title,
   users,
   connected,
+  onToggleHistory,
 }: {
   title: string;
   users: PresenceUser[];
   connected: boolean;
+  onToggleHistory?: () => void;
 }) {
   return (
     <div
@@ -38,7 +40,18 @@ export function TopBar({
         </h1>
       </div>
 
-      <PresenceAvatars users={users} />
+      <div className="flex items-center gap-4">
+        <PresenceAvatars users={users} />
+        {onToggleHistory && (
+          <button
+            onClick={onToggleHistory}
+            className="text-xs"
+            style={{ color: "var(--color-signal)", fontFamily: "var(--font-display)" }}
+          >
+            History
+          </button>
+        )}
+      </div>
     </div>
   );
 }
