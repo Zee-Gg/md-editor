@@ -1,54 +1,51 @@
 "use client";
 
-import { useEffect, useRef, useState, useCallback } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useParams } from "next/navigation";
 import * as Y from "yjs";
+import { Awareness } from "y-protocols/awareness";
+import * as awarenessProtocol from "y-protocols/awareness";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { createSocket } from "../../lib/socket";
 import { TopBar } from "../../components/TopBar";
-import { SignalSeam } from "../../components/SignalSeam";
+import { CollaborativeEditor } from "../../components/CollaborativeEditor";
 
 interface PresenceUser {
   userId: string;
   socketId: string;
   name: string;
   color: string;
-  cursorPosition?: number;
 }
 
-interface RemoteCursor {
-  socketId: string;
-  position: number;
-}
+const CURSOR_COLORS = ["#F87171", "#FBBF24", "#34D399", "#60A5FA", "#A78BFA", "#F472B6"];
 
 export default function EditorPage() {
   const params = useParams();
   const documentId = params.id as string;
 
+  // Created once, lazily — never reassigned via setState, so no cascading-render issue
+  const [ydoc] = useState(() => new Y.Doc());
+  const [ytext] = useState(() => ydoc.getText("content"));
+  const [awareness] = useState(() => new Awareness(ydoc));
+
   const [content, setContent] = useState("");
   const [connected, setConnected] = useState(false);
   const [users, setUsers] = useState<PresenceUser[]>([]);
   const [typingUser, setTypingUser] = useState<string | null>(null);
-  const [remoteCursors, setRemoteCursors] = useState<RemoteCursor[]>([]);
 
-  const ydocRef = useRef<Y.Doc | null>(null);
-  const ytextRef = useRef<Y.Text | null>(null);
   const socketRef = useRef<ReturnType<typeof createSocket> | null>(null);
   const typingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
-    // TEMP: token comes from localStorage until login page exists
     const token = localStorage.getItem("token");
     if (!token) {
       console.error("No token found — log in first.");
       return;
     }
 
-    const ydoc = new Y.Doc();
-    const ytext = ydoc.getText("content");
-    ydocRef.current = ydoc;
-    ytextRef.current = ytext;
+    const myColor = CURSOR_COLORS[Math.floor(Math.random() * CURSOR_COLORS.length)];
+    awareness.setLocalStateField("user", { name: "You", color: myColor });
 
     const socket = createSocket(token);
     socketRef.current = socket;
@@ -75,13 +72,14 @@ export default function EditorPage() {
       setContent(ytext.toString());
     });
 
-    socket.on("presence-list", (userList: PresenceUser[]) => {
-      setUsers(userList);
+    socket.on("awareness-update", (update: Uint8Array) => {
+      awarenessProtocol.applyAwarenessUpdate(awareness, new Uint8Array(update), "remote");
     });
 
-    socket.on("user-left", ({ userId }: { userId: string }) => {
-      setUsers((prev) => prev.filter((u) => u.userId !== userId));
-      setRemoteCursors((prev) => prev.filter((c) => c.socketId !== userId));
+    socket.on("presence-list", (userList: PresenceUser[]) => {
+      setUsers(userList);
+      const me = userList.find((u) => u.socketId === socket.id);
+      if (me) awareness.setLocalStateField("user", { name: me.name, color: me.color });
     });
 
     socket.on("user-typing", ({ userName }: { userName: string }) => {
@@ -90,62 +88,36 @@ export default function EditorPage() {
       typingTimeoutRef.current = setTimeout(() => setTypingUser(null), 2000);
     });
 
-    socket.on(
-      "cursor-update",
-      ({ socketId, position }: { userId: string; socketId: string; position: number }) => {
-        setRemoteCursors((prev) => {
-          const others = prev.filter((c) => c.socketId !== socketId);
-          return [...others, { socketId, position }];
-        });
-      }
-    );
-
-    ydoc.on("update", (update: Uint8Array, origin: unknown) => {
-      if (origin === "local") {
+    const handleDocUpdate = (update: Uint8Array, origin: unknown) => {
+      if (origin !== "remote") {
         socket.emit("sync-update", update);
       }
-    });
+      setContent(ytext.toString());
+    };
+    ydoc.on("update", handleDocUpdate);
+
+    const handleAwarenessUpdate = ({
+      added,
+      updated,
+      removed,
+    }: {
+      added: number[];
+      updated: number[];
+      removed: number[];
+    }) => {
+      const changedClients = added.concat(updated).concat(removed);
+      const update = awarenessProtocol.encodeAwarenessUpdate(awareness, changedClients);
+      socket.emit("awareness-update", update);
+    };
+    awareness.on("update", handleAwarenessUpdate);
 
     return () => {
+      ydoc.off("update", handleDocUpdate);
+      awareness.off("update", handleAwarenessUpdate);
+      awareness.setLocalState(null);
       socket.disconnect();
     };
-  }, [documentId]);
-
-  const handleChange = useCallback((e: React.ChangeEvent<HTMLTextAreaElement>) => {
-    const newValue = e.target.value;
-    const ytext = ytextRef.current;
-    const ydoc = ydocRef.current;
-    if (!ytext || !ydoc) return;
-
-    ydoc.transact(() => {
-      ytext.delete(0, ytext.length);
-      ytext.insert(0, newValue);
-    }, "local");
-
-    setContent(newValue);
-    socketRef.current?.emit("typing-start");
-    socketRef.current?.emit("cursor-move", e.target.selectionStart);
-  }, []);
-
-  const handleCursorMove = useCallback((e: React.SyntheticEvent<HTMLTextAreaElement>) => {
-    const target = e.target as HTMLTextAreaElement;
-    socketRef.current?.emit("cursor-move", target.selectionStart);
-  }, []);
-
-  const cursorMarkers = remoteCursors
-    .map((cursor) => {
-      const user = users.find((u) => u.socketId === cursor.socketId);
-      if (!user) return null;
-      const relativePosition = content.length > 0 ? cursor.position / content.length : 0;
-      return {
-        socketId: cursor.socketId,
-        color: user.color,
-        relativePosition,
-      };
-    })
-    .filter(
-      (c): c is { socketId: string; color: string; relativePosition: number } => c !== null
-    );
+  }, [documentId, ydoc, ytext, awareness]);
 
   return (
     <div className="flex h-screen flex-col">
@@ -161,22 +133,13 @@ export default function EditorPage() {
       )}
 
       <div className="flex flex-1 overflow-hidden">
-        <textarea
-          value={content}
-          onChange={handleChange}
-          onClick={handleCursorMove}
-          onKeyUp={handleCursorMove}
-          spellCheck={false}
-          placeholder="Start writing…"
-          className="h-full w-1/2 resize-none p-6 text-sm leading-relaxed outline-none"
-          style={{
-            backgroundColor: "var(--color-ink)",
-            color: "var(--color-chalk)",
-            fontFamily: "var(--font-mono)",
-          }}
+        <CollaborativeEditor
+          ytext={ytext}
+          awareness={awareness}
+          onTyping={() => socketRef.current?.emit("typing-start")}
         />
 
-        <SignalSeam cursors={cursorMarkers} />
+        <div className="w-px shrink-0" style={{ backgroundColor: "var(--color-line)" }} />
 
         <div
           className="h-full w-1/2 overflow-y-auto p-6 text-sm leading-relaxed"

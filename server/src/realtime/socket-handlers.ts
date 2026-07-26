@@ -52,7 +52,7 @@ export function registerSocketHandlers(io: Server) {
 
       const isOwner = document.ownerId === userId;
       const isCollaborator = document.collaborators.some(
-        (c: { userId: string }) => c.userId === userId
+        (c: { userId: string }) => c.userId === userId,
       );
 
       if (!isOwner && !isCollaborator) {
@@ -72,7 +72,12 @@ export function registerSocketHandlers(io: Server) {
       socket.emit("sync-init", state);
 
       // Add to presence, tell everyone (including the new user) who's online
-      const presenceUser = addUserToDocument(documentId, socket.id, userId, userName);
+      const presenceUser = addUserToDocument(
+        documentId,
+        socket.id,
+        userId,
+        userName,
+      );
       io.to(documentId).emit("presence-list", getUsersInDocument(documentId));
       socket.to(documentId).emit("user-joined", presenceUser);
     });
@@ -87,6 +92,11 @@ export function registerSocketHandlers(io: Server) {
       socket.to(currentDocId).emit("sync-update", update);
 
       scheduleSave(currentDocId);
+    });
+
+    socket.on("awareness-update", (update: Uint8Array) => {
+      if (!currentDocId) return;
+      socket.to(currentDocId).emit("awareness-update", update);
     });
 
     // Cursor position broadcast
@@ -104,7 +114,9 @@ export function registerSocketHandlers(io: Server) {
     // Typing indicator
     socket.on("typing-start", () => {
       if (!currentDocId) return;
-      socket.to(currentDocId).emit("user-typing", { userId, userName: socket.userName });
+      socket
+        .to(currentDocId)
+        .emit("user-typing", { userId, userName: socket.userName });
     });
 
     socket.on("typing-stop", () => {
@@ -115,7 +127,10 @@ export function registerSocketHandlers(io: Server) {
     socket.on("disconnect", () => {
       if (currentDocId) {
         removeUserFromDocument(currentDocId, socket.id);
-        io.to(currentDocId).emit("presence-list", getUsersInDocument(currentDocId));
+        io.to(currentDocId).emit(
+          "presence-list",
+          getUsersInDocument(currentDocId),
+        );
         socket.to(currentDocId).emit("user-left", { userId });
       }
       console.log(`User ${userId} disconnected`);

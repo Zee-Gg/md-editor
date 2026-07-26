@@ -43,3 +43,12 @@ body {
   background-color: var(--color-signal);
   color: var(--color-ink);
 }
+
+.cm-ySelectionInfo {
+  font-family: var(--font-body);
+  font-size: 11px;
+  padding: 2px 6px;
+  border-radius: 4px;
+  color: var(--color-ink);
+  opacity: 0.95;
+}
