@@ -12,6 +12,7 @@ import { TopBar } from "../../components/TopBar";
 import { CollaborativeEditor } from "../../components/CollaborativeEditor";
 import { VersionHistoryPanel } from "../../components/VersionHistoryPanel";
 import { SharePanel } from "../../components/SharePanel";
+import { getDocument } from "../../lib/api";
 
 interface PresenceUser {
   userId: string;
@@ -46,6 +47,7 @@ export default function EditorPage() {
   const [historyOpen, setHistoryOpen] = useState(false);
   const [shareOpen, setShareOpen] = useState(false);
   const [role, setRole] = useState<string | null>(null);
+  const [title, setTitle] = useState("Untitled Document");
 
   const socketRef = useRef<ReturnType<typeof createSocket> | null>(null);
   const typingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -60,6 +62,10 @@ export default function EditorPage() {
     const myColor =
       CURSOR_COLORS[Math.floor(Math.random() * CURSOR_COLORS.length)];
     awareness.setLocalStateField("user", { name: "You", color: myColor });
+
+    getDocument(documentId)
+      .then((doc) => setTitle(doc.title))
+      .catch((err) => console.error("Failed to load document:", err));
 
     const socket = createSocket(token);
     socketRef.current = socket;
@@ -162,11 +168,14 @@ export default function EditorPage() {
   return (
     <div className="flex h-screen flex-col">
       <TopBar
-        title="Untitled Document"
+        documentId={documentId}
+        title={title}
         users={users}
         connected={connected}
+        editable={role === "owner"}
         onToggleHistory={() => setHistoryOpen((v) => !v)}
         onToggleShare={() => setShareOpen((v) => !v)}
+        onRenamed={setTitle}
       />
 
       {typingUser && (

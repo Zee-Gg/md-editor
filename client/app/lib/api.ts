@@ -29,6 +29,15 @@ interface CollaboratorsResponse {
   owner: { id: string; name: string; email: string };
   collaborators: Collaborator[];
 }
+
+interface DocumentDetail {
+  id: string;
+  title: string;
+  content: string;
+  ownerId: string;
+}
+
+
 async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   const token = localStorage.getItem("token");
 
@@ -100,5 +109,16 @@ export function addCollaborator(documentId: string, email: string, role: "editor
 export function removeCollaborator(documentId: string, userId: string) {
   return request<{ message: string }>(`/api/documents/${documentId}/collaborators/${userId}`, {
     method: "DELETE",
+  });
+}
+
+export function getDocument(documentId: string) {
+  return request<DocumentDetail>(`/api/documents/${documentId}`);
+}
+
+export function renameDocument(documentId: string, title: string) {
+  return request<DocumentDetail>(`/api/documents/${documentId}`, {
+    method: "PATCH",
+    body: JSON.stringify({ title }),
   });
 }

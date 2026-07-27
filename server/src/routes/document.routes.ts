@@ -5,6 +5,7 @@ import {
   listDocuments,
   getDocument,
   deleteDocument,
+  renameDocument,
 } from "../controllers/document.controller";
 
 const router = Router();
@@ -15,5 +16,6 @@ router.post("/", createDocument);
 router.get("/", listDocuments);
 router.get("/:id", getDocument);
 router.delete("/:id", deleteDocument);
+router.patch("/:id", renameDocument);
 
 export default router;

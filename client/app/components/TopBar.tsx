@@ -1,6 +1,8 @@
 "use client";
 
+import Link from "next/link";
 import { PresenceAvatars } from "./PresenceAvatars";
+import { EditableTitle } from "./EditableTitle";
 
 interface PresenceUser {
   userId: string;
@@ -10,17 +12,23 @@ interface PresenceUser {
 }
 
 export function TopBar({
+  documentId,
   title,
   users,
   connected,
+  editable,
   onToggleHistory,
   onToggleShare,
+  onRenamed,
 }: {
+  documentId: string;
   title: string;
   users: PresenceUser[];
   connected: boolean;
+  editable: boolean;
   onToggleHistory?: () => void;
   onToggleShare?: () => void;
+  onRenamed: (newTitle: string) => void;
 }) {
   return (
     <div
@@ -28,18 +36,25 @@ export function TopBar({
       style={{ borderColor: "var(--color-line)", backgroundColor: "var(--color-paper)" }}
     >
       <div className="flex items-center gap-3">
+        <Link
+          href="/dashboard"
+          className="text-xs"
+          style={{ color: "#6B7280", fontFamily: "var(--font-display)" }}
+        >
+          ← Dashboard
+        </Link>
         <span
           className={`h-2 w-2 rounded-full ${connected ? "signal-pulse" : ""}`}
           style={{
             backgroundColor: connected ? "var(--color-signal)" : "var(--color-line)",
           }}
         />
-        <h1
-          className="text-sm font-medium tracking-tight"
-          style={{ fontFamily: "var(--font-display)", color: "var(--color-chalk)" }}
-        >
-          {title}
-        </h1>
+        <EditableTitle
+          documentId={documentId}
+          title={title}
+          editable={editable}
+          onRenamed={onRenamed}
+        />
       </div>
 
       <div className="flex items-center gap-4">

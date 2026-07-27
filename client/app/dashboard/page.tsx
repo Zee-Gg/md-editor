@@ -60,14 +60,23 @@ export default function DashboardPage() {
   }
 
   return (
-    <div className="min-h-screen" style={{ backgroundColor: "var(--color-ink)" }}>
+    <div
+      className="min-h-screen"
+      style={{ backgroundColor: "var(--color-ink)" }}
+    >
       <div
         className="flex h-14 items-center justify-between border-b px-6"
-        style={{ borderColor: "var(--color-line)", backgroundColor: "var(--color-paper)" }}
+        style={{
+          borderColor: "var(--color-line)",
+          backgroundColor: "var(--color-paper)",
+        }}
       >
         <h1
           className="text-sm font-medium"
-          style={{ fontFamily: "var(--font-display)", color: "var(--color-chalk)" }}
+          style={{
+            fontFamily: "var(--font-display)",
+            color: "var(--color-chalk)",
+          }}
         >
           Your Documents
         </h1>
@@ -93,7 +102,9 @@ export default function DashboardPage() {
             className="rounded-lg border border-dashed p-10 text-center"
             style={{ borderColor: "var(--color-line)" }}
           >
-            <p style={{ color: "#9CA3AF" }}>No documents yet. Create your first one.</p>
+            <p style={{ color: "#9CA3AF" }}>
+              No documents yet. Create your first one.
+            </p>
           </div>
         ) : (
           <div className="space-y-2">
@@ -102,10 +113,18 @@ export default function DashboardPage() {
                 key={doc.id}
                 onClick={() => router.push(`/editor/${doc.id}`)}
                 className="flex cursor-pointer items-center justify-between rounded-md border p-4 transition-colors hover:border-[var(--color-signal)]"
-                style={{ borderColor: "var(--color-line)", backgroundColor: "var(--color-paper)" }}
+                style={{
+                  borderColor: "var(--color-line)",
+                  backgroundColor: "var(--color-paper)",
+                }}
               >
                 <div>
-                  <p style={{ color: "var(--color-chalk)", fontFamily: "var(--font-display)" }}>
+                  <p
+                    style={{
+                      color: "var(--color-chalk)",
+                      fontFamily: "var(--font-display)",
+                    }}
+                  >
                     {doc.title}
                   </p>
                   <p className="text-xs" style={{ color: "#6B7280" }}>

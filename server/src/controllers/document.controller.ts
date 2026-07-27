@@ -52,6 +52,34 @@ export async function listDocuments(req: AuthRequest, res: Response) {
   }
 }
 
+export async function renameDocument(req: AuthRequest, res: Response) {
+  try {
+    const userId = req.userId!;
+    const id = req.params.id as string;
+    const { title } = req.body;
+
+    if (!title || typeof title !== "string" || !title.trim()) {
+      return res.status(400).json({ error: "Title is required" });
+    }
+
+    const document = await prisma.document.findUnique({ where: { id } });
+    if (!document) return res.status(404).json({ error: "Document not found" });
+    if (document.ownerId !== userId) {
+      return res.status(403).json({ error: "Only the owner can rename this document" });
+    }
+
+    const updated = await prisma.document.update({
+      where: { id },
+      data: { title: title.trim() },
+    });
+
+    return res.status(200).json(updated);
+  } catch (error) {
+    console.error(error);
+    return res.status(500).json({ error: "Failed to rename document" });
+  }
+}
+
 // Get a single document (must be owner or collaborator)
 export async function getDocument(req: AuthRequest, res: Response) {
   try {
@@ -109,3 +137,4 @@ export async function deleteDocument(req: AuthRequest, res: Response) {
     return res.status(500).json({ error: "Failed to delete document" });
   }
 }
+
